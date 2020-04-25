@@ -3,8 +3,10 @@ import { GraphQLServer } from 'graphql-yoga';
 // Type definitions (schema)
 const typeDefs = `
   type Query {
+    greeting(name: String, position: String): String!
     me: User!
     post: Post!
+    add(a: Float!, b: Float!): Float!
   }
 
   # custom type
@@ -39,7 +41,13 @@ const resolvers = {
         body: 'GraphQL is awesome!',
         published: true
       };
-    }
+    },
+    greeting: (parent, args) => {
+      return args.name && args.position
+        ? `Hi, ${args.name}! you're ${args.position}`
+        : `Hello!`;
+    },
+    add: (parent, args) => args.a + args.b
   }
 };
 
