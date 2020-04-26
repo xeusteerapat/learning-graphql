@@ -1,4 +1,5 @@
 import { GraphQLServer } from 'graphql-yoga';
+import { v4 as uuid } from 'uuid';
 
 // mock data
 const users = [
@@ -131,6 +132,12 @@ const typeDefs = `
     author: User!
     post: Post!
   }
+
+  type Mutation {
+    createUser(name: String!, email: String!, age: Int): User!
+    createPost(title: String!, body: String!, published: Boolean!, author: ID!): Post!
+    createComment(text: String!, author: ID!, post: ID!): Comment!
+  }
 `;
 
 const resolvers = {
@@ -199,6 +206,65 @@ const resolvers = {
     },
     post: (parent, args, ctx, info) => {
       return posts.find(post => post.id === parent.post);
+    }
+  },
+
+  Mutation: {
+    createUser: (parent, args, ctx, info) => {
+      const isEmailTaken = users.some(user => user.email === args.email);
+
+      if (isEmailTaken) {
+        throw new Error('Email already taken.');
+      }
+
+      const user = {
+        id: uuid(),
+        ...args
+      };
+
+      users.push(user);
+
+      return user;
+    },
+
+    createPost: (parent, args, ctx, info) => {
+      const userExists = users.some(user => user.id === args.author);
+
+      if (!userExists) {
+        throw new Error('User not found.');
+      }
+
+      const post = {
+        id: uuid(),
+        ...args
+      };
+
+      posts.push(post);
+
+      return post;
+    },
+
+    createComment: (parent, args, ctx, info) => {
+      const userExists = users.some(user => user.id === args.author);
+      const postExists = posts.some(
+        post => post.id === args.post && post.published
+      );
+
+      if (!userExists) {
+        throw new Error('User not found.');
+      }
+      if (!postExists) {
+        throw new Error('Post not found.');
+      }
+
+      const comment = {
+        id: uuid(),
+        ...args
+      };
+
+      comments.push(comment);
+
+      return comment;
     }
   }
 };
