@@ -2,7 +2,7 @@ import { GraphQLServer } from 'graphql-yoga';
 import { v4 as uuid } from 'uuid';
 
 // mock data
-const users = [
+let users = [
   {
     id: '1',
     name: 'Teerapat Prommarak',
@@ -29,7 +29,7 @@ const users = [
   }
 ];
 
-const posts = [
+let posts = [
   {
     id: '1',
     title: 'Today, I learned graphql',
@@ -64,7 +64,7 @@ const posts = [
   }
 ];
 
-const comments = [
+let comments = [
   {
     id: '6',
     text: 'Awesome!',
@@ -134,9 +134,31 @@ const typeDefs = `
   }
 
   type Mutation {
-    createUser(name: String!, email: String!, age: Int): User!
-    createPost(title: String!, body: String!, published: Boolean!, author: ID!): Post!
-    createComment(text: String!, author: ID!, post: ID!): Comment!
+    createUser(data: CreateUserInput): User!
+    deleteUser(id: ID!): User!
+    createPost(data: CreatePostInput): Post!
+    deletePost(id: ID!): Post!
+    createComment(data: CreateCommentInput): Comment!
+    deleteComment(id: ID!): Comment!
+  }
+
+  input CreateUserInput {
+    name: String!
+    email: String!
+    age: Int
+  }
+
+  input CreatePostInput {
+    title: String!
+    body: String!
+    published: Boolean!
+    author: ID!
+  }
+
+  input CreateCommentInput {
+    text: String!
+    author: ID!
+    post: ID!
   }
 `;
 
@@ -184,6 +206,7 @@ const resolvers = {
       return comments;
     }
   },
+
   Post: {
     author: (parent, args, ctx, info) => {
       return users.find(user => user.id === parent.author);
@@ -211,7 +234,7 @@ const resolvers = {
 
   Mutation: {
     createUser: (parent, args, ctx, info) => {
-      const isEmailTaken = users.some(user => user.email === args.email);
+      const isEmailTaken = users.some(user => user.email === args.data.email);
 
       if (isEmailTaken) {
         throw new Error('Email already taken.');
@@ -219,7 +242,7 @@ const resolvers = {
 
       const user = {
         id: uuid(),
-        ...args
+        ...args.data
       };
 
       users.push(user);
@@ -227,8 +250,31 @@ const resolvers = {
       return user;
     },
 
+    deleteUser: (parent, args, ctx, info) => {
+      const userIndex = users.findIndex(user => user.id === args.id);
+
+      if (userIndex === -1) {
+        throw new Error('User not found');
+      }
+
+      const deletedUsers = users.splice(userIndex, 1);
+
+      posts = posts.filter(post => {
+        const isMatch = post.author === args.id;
+
+        if (isMatch) {
+          comments = comments.filter(comment => comment.post !== post.id);
+        }
+
+        return !isMatch;
+      });
+      comments = comments.filter(comment => comment.author !== args.id);
+
+      return deletedUsers[0];
+    },
+
     createPost: (parent, args, ctx, info) => {
-      const userExists = users.some(user => user.id === args.author);
+      const userExists = users.some(user => user.id === args.data.author);
 
       if (!userExists) {
         throw new Error('User not found.');
@@ -236,7 +282,7 @@ const resolvers = {
 
       const post = {
         id: uuid(),
-        ...args
+        ...args.data
       };
 
       posts.push(post);
@@ -244,10 +290,23 @@ const resolvers = {
       return post;
     },
 
+    deletePost: (parent, args, ctx, info) => {
+      const deletedPost = posts.find(post => post.id === args.id);
+
+      if (!deletedPost) {
+        throw new Error('Post not found');
+      }
+
+      posts = posts.filter(post => post.id !== args.id);
+      comments = comments.filter(comment => comment.post !== args.id);
+
+      return deletedPost;
+    },
+
     createComment: (parent, args, ctx, info) => {
-      const userExists = users.some(user => user.id === args.author);
+      const userExists = users.some(user => user.id === args.data.author);
       const postExists = posts.some(
-        post => post.id === args.post && post.published
+        post => post.id === args.data.post && post.published
       );
 
       if (!userExists) {
@@ -259,12 +318,24 @@ const resolvers = {
 
       const comment = {
         id: uuid(),
-        ...args
+        ...args.data
       };
 
       comments.push(comment);
 
       return comment;
+    },
+
+    deleteComment: (parent, args, ctx, info) => {
+      const deletedComment = comments.find(comment => comment.id === args.id);
+
+      if (!deletedComment) {
+        throw new Error('Comment not found');
+      }
+
+      comments = comments.filter(comment => comment.id !== args.id);
+
+      return deletedComment;
     }
   }
 };
